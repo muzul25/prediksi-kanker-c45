@@ -1,73 +1,52 @@
 import streamlit as st
 import pandas as pd
-import io
+import urllib.parse
 
-st.set_page_config(page_title="Follow-Up Berkas RM", layout="centered")
-st.title("📁 Aplikasi Follow-Up Kelengkapan Rekam Medis")
+st.set_page_config(page_title="Follow-Up WhatsApp RM", layout="centered")
+st.title("📁 Follow-Up Rekam Medis via WhatsApp")
 
-# Simpan data di session_state
-if 'data_dokter' not in st.session_state:
-    st.session_state.data_dokter = pd.DataFrame(columns=[
-        'Nama Dokter', 'Nomor WA', 'Status Berkas', 'Catatan'
-    ])
+# Upload file spreadsheet
+uploaded_file = st.file_uploader("📤 Upload Spreadsheet Dokter (CSV/XLSX)", type=["csv", "xlsx"])
 
-# SECTION 1: Tambah Dokter
-with st.expander("➕ Tambah Dokter Baru", expanded=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        nama_dokter = st.text_input("Nama Dokter")
-        no_wa = st.text_input("Nomor WA (cth: 6281234567890)")
-    with col2:
-        status = st.selectbox("Status Berkas", ["Belum Lengkap", "Lengkap", "Belum anamnessa", "Belum Isi resume pasien"])
-        catatan = st.text_input("Catatan (opsional)")
+if uploaded_file:
+    # Load data
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
 
-    if st.button("➕ Tambah ke Daftar"):
-        if nama_dokter and no_wa:
-            new_row = {
-                'Nama Dokter': nama_dokter,
-                'Nomor WA': no_wa,
-                'Status Berkas': status,
-                'Catatan': catatan
-            }
-            st.session_state.data_dokter = pd.concat([
-                st.session_state.data_dokter,
-                pd.DataFrame([new_row])
-            ], ignore_index=True)
-            st.success("✅ Dokter berhasil ditambahkan.")
+    st.success("✅ File berhasil dimuat!")
+
+    # Validasi kolom
+    required_cols = ['Nama Dokter', 'Nomor WA', 'Status']
+    if not all(col in df.columns for col in required_cols):
+        st.error(f"❌ Kolom wajib: {', '.join(required_cols)}")
+    else:
+        # Filter dokter belum lengkap
+        df_belum = df[~df['Status'].str.lower().str.contains("lengkap")]
+
+        if df_belum.empty:
+            st.success("🎉 Semua data dokter lengkap!")
         else:
-            st.warning("❗ Nama Dokter dan Nomor WA wajib diisi.")
+            st.markdown("### 👨‍⚕️ Daftar Dokter Belum Lengkap")
+            selected = st.selectbox("Pilih Dokter", df_belum['Nama Dokter'])
 
-# SECTION 2: Daftar Dokter
-st.markdown("### 👥 Daftar Dokter")
-st.dataframe(st.session_state.data_dokter, use_container_width=True)
+            row = df_belum[df_belum['Nama Dokter'] == selected].iloc[0]
+            nomor = str(row['Nomor WA']).strip()
+            status = row['Status']
+            nama = row['Nama Dokter']
 
-# Download CSV
-csv = st.session_state.data_dokter.to_csv(index=False).encode('utf-8')
-st.download_button("⬇️ Download CSV Dokter", data=csv, file_name="data_dokter.csv", mime='text/csv')
+            # Template pesan
+            pesan = f"""Assalamu'alaikum {nama},
 
-# SECTION 3: Follow-Up WhatsApp
-st.markdown("### 📲 Follow-Up WhatsApp")
+Mohon segera melengkapi rekam medis pasien Anda.
+Status saat ini: *{status}*.
 
-df_tidak_lengkap = st.session_state.data_dokter[
-    ~st.session_state.data_dokter['Status Berkas'].str.lower().str.contains("lengkap")
-]
+Terima kasih 🙏"""
 
-if not df_tidak_lengkap.empty:
-    dokter_pilihan = st.selectbox("Pilih Dokter yang Belum Lengkap", df_tidak_lengkap['Nama Dokter'].unique())
-    catatan_tambahan = st.text_area("📝 Tambahkan Catatan Tambahan (Opsional)")
+            # Encode pesan untuk URL
+            encoded_pesan = urllib.parse.quote(pesan)
+            wa_link = f"https://wa.me/{nomor}?text={encoded_pesan}"
 
-    if st.button("📤 Buat Pesan Follow-Up"):
-        row = df_tidak_lengkap[df_tidak_lengkap['Nama Dokter'] == dokter_pilihan].iloc[0]
-        pesan = f"""Assalamu'alaikum {row['Nama Dokter']},
-Rekam medis Anda masih belum lengkap dengan status:
-📄 {row['Status Berkas']}
-
-🗒️ Catatan: {row['Catatan'] or '-'}
-{f"\n📌 Tambahan: {catatan_tambahan}" if catatan_tambahan else ''}
-
-Mohon segera dilengkapi. Terima kasih 🙏"""
-
-        st.text_area("📤 Preview Pesan WhatsApp", pesan, height=180)
-        st.info("⚠️ Pengiriman WhatsApp belum diaktifkan.\nUntuk kirim otomatis, integrasikan API seperti Twilio atau Wablas.")
-else:
-    st.success("✅ Semua berkas dokter sudah lengkap.")
+            st.text_area("📨 Isi Pesan", pesan, height=150)
+            st.markdown(f"[📤 Kirim via WhatsApp]({wa_link})", unsafe_allow_html=True)
