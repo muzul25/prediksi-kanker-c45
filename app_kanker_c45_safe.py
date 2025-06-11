@@ -76,3 +76,4 @@ with tab2:
                 st.error(f"❌ File tidak memiliki kolom lengkap: {fitur}")
         except Exception as e:
             st.error(f"Terjadi kesalahan saat memproses file: {e}")
+            
