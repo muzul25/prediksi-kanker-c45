@@ -1,85 +1,51 @@
 import streamlit as st
 import pandas as pd
-from urllib.parse import quote
-from datetime import datetime
+import pywhatkit
+import datetime
 
-st.set_page_config("📲 Follow-Up Berkas Dokter", layout="wide")
+st.set_page_config(page_title="Follow-Up RM Dokter", layout="wide")
+st.title("📋 Aplikasi Follow-Up Dokter untuk Rekam Medis Tidak Lengkap")
 
-st.title("🩺 Sistem Follow-Up Berkas Dokter")
+uploaded_file = st.file_uploader("Unggah File Excel", type=["xlsx"])
 
-# Inisialisasi data dokter
-if "dokter_df" not in st.session_state:
-    st.session_state.dokter_df = pd.DataFrame({
-        "Nama Dokter": ["dr. Andi", "dr. Budi", "dr. Clara"],
-        "Nomor WA": ["6281234567890", "6281234500001", "6281212345678"],
-        "Status Berkas": ["❌ Belum Lengkap", "✅ Lengkap", "❌ Belum Lengkap"],
-        "Catatan": ["Belum upload hasil lab", "", "Form anamnesa belum dikirim"]
-    })
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
 
-# Inisialisasi riwayat follow-up
-if "riwayat_df" not in st.session_state:
-    st.session_state.riwayat_df = pd.DataFrame(columns=["Waktu", "Nama Dokter", "Pesan"])
+    # Tampilkan isi file
+    st.subheader("Data Pasien")
+    st.dataframe(df)
 
-# --- FORM TAMBAH DOKTER
-with st.expander("➕ Tambah Dokter Baru"):
-    with st.form("form_dokter"):
-        nama = st.text_input("Nama Dokter")
-        nomor = st.text_input("Nomor WA (cth: 6281234567890)")
-        status = st.selectbox("Status Berkas", ["❌ Belum Lengkap", "✅ Lengkap"])
-        catatan = st.text_area("Catatan Berkas")
-        submit = st.form_submit_button("Tambah ke Daftar")
+    # Filter pasien dengan status "Tidak Lengkap"
+    df_tidak_lengkap = df[df['Status RM'].str.lower() == "tidak lengkap"]
 
-        if submit:
-            new_row = pd.DataFrame({
-                "Nama Dokter": [nama],
-                "Nomor WA": [nomor],
-                "Status Berkas": [status],
-                "Catatan": [catatan]
-            })
-            st.session_state.dokter_df = pd.concat([st.session_state.dokter_df, new_row], ignore_index=True)
-            st.success(f"✅ Dokter {nama} ditambahkan!")
+    if not df_tidak_lengkap.empty:
+        st.subheader("📌 Pasien dengan RM Tidak Lengkap")
+        st.dataframe(df_tidak_lengkap)
 
-# --- TABEL & EXPORT CSV
-st.subheader("📋 Daftar Dokter")
-st.dataframe(st.session_state.dokter_df, use_container_width=True)
+        # Kelompokkan berdasarkan dokter
+        grouped = df_tidak_lengkap.groupby(['Nama Dokter', 'No WA Dokter'])
 
-csv = st.session_state.dokter_df.to_csv(index=False).encode("utf-8")
-st.download_button("⬇️ Download CSV Dokter", data=csv, file_name="daftar_dokter.csv", mime="text/csv")
+        st.subheader("📲 Kirim Follow-Up via WhatsApp")
 
-# --- PILIH DOKTER UNTUK FOLLOW-UP
-st.subheader("📤 Follow-Up WhatsApp")
-df_filter = st.session_state.dokter_df[st.session_state.dokter_df["Status Berkas"] == "❌ Belum Lengkap"]
+        for (dokter, no_wa), group in grouped:
+            st.markdown(f"**{dokter} ({no_wa})**")
 
-if len(df_filter) == 0:
-    st.info("Semua dokter sudah melengkapi berkas 🙌")
-else:
-    dokter_terpilih = st.selectbox("Pilih Dokter yang Belum Lengkap", df_filter["Nama Dokter"])
-    catatan_tambahan = st.text_area("📝 Tambahkan Catatan Tambahan (Opsional)")
+            pesan = f"Assalamu'alaikum {dokter},\nBerikut daftar pasien Anda dengan rekam medis yang belum lengkap:\n"
+            for _, row in group.iterrows():
+                pesan += f"- {row['Nama Pasien']} (RM: {row['No RM']})\n"
+            pesan += "\nMohon segera dilengkapi. Terima kasih 🙏"
 
-    info = df_filter[df_filter["Nama Dokter"] == dokter_terpilih].iloc[0]
-    nomor = info["Nomor WA"]
-    catatan = info["Catatan"]
+            st.text_area("Pesan WhatsApp", value=pesan, height=150, key=no_wa)
 
-    # Buat isi pesan
-    pesan = f"Halo {dokter_terpilih}, mohon segera melengkapi berkas pasien.\n\nCatatan: {catatan}"
-    if catatan_tambahan:
-        pesan += f"\nTambahan: {catatan_tambahan}"
-    url = f"https://wa.me/{nomor}?text={quote(pesan)}"
-
-    # Tampilkan tautan WA
-    st.markdown(f"👉 [📲 Kirim WhatsApp ke {dokter_terpilih}]({url})", unsafe_allow_html=True)
-
-    if st.button("📌 Simpan ke Riwayat Follow-Up"):
-        waktu = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        new_row = pd.DataFrame([[waktu, dokter_terpilih, pesan]], columns=["Waktu", "Nama Dokter", "Pesan"])
-        st.session_state.riwayat_df = pd.concat([st.session_state.riwayat_df, new_row], ignore_index=True)
-        st.success("✅ Riwayat follow-up disimpan.")
-
-# --- TAMPILKAN RIWAYAT
-st.subheader("🕘 Riwayat Follow-Up")
-if st.session_state.riwayat_df.empty:
-    st.info("Belum ada follow-up dilakukan.")
-else:
-    st.dataframe(st.session_state.riwayat_df, use_container_width=True)
-    riwayat_csv = st.session_state.riwayat_df.to_csv(index=False).encode("utf-8")
-    st.download_button("⬇️ Download Riwayat Follow-Up", data=riwayat_csv, file_name="riwayat_followup.csv", mime="text/csv")
+            if st.button(f"Kirim ke {dokter}", key=f"kirim_{no_wa}"):
+                try:
+                    # Kirim pesan via WhatsApp Web (jadwalkan 1 menit dari waktu sekarang)
+                    now = datetime.datetime.now()
+                    jam = now.hour
+                    menit = now.minute + 1
+                    pywhatkit.sendwhatmsg(f"+{no_wa}", pesan, jam, menit, wait_time=10, tab_close=True)
+                    st.success(f"Pesan ke {dokter} berhasil dijadwalkan!")
+                except Exception as e:
+                    st.error(f"Gagal mengirim pesan ke {dokter}: {e}")
+    else:
+        st.info("✅ Semua rekam medis sudah lengkap.")
