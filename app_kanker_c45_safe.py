@@ -83,14 +83,16 @@ if uploaded_file:
                     nomor = str(row["Nomor WA"]).replace("+", "").replace(" ", "").replace("-", "").strip()
                     status = row["Status"]
 
-                    pesan = f"""Assalamu'alaikum {nama},
+                    pesan = f"""Hallo {nama},
 
-Mohon segera melengkapi rekam medis pasien Anda.
-Status saat ini: *{status}*.
+Saya dengan staff KLPCM Rekam Medis izin konfirmasi dok ada berkas yang belum lengkap,
+Mohon dibantu segera melengkapi rekam medis pasien, yang sesuai aturan kelengkapan yaitu melengkapi maximal 2x24 jam.
+Berkas sudah di follow up ke poliklinik.
+Status berkas saat ini: *{status}*.
 
 {catatan_tambahan}
 
-Terima kasih 🙏"""
+Terima kasih sebelumnya dok """
 
                     encoded_pesan = urllib.parse.quote(pesan, safe='')
                     wa_link = f"https://wa.me/{nomor}?text={encoded_pesan}"
