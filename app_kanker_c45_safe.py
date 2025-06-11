@@ -76,8 +76,9 @@ if uploaded_file:
 
                 pesan = f"""Assalamu'alaikum {nama},
 
-Saya dari staff KLPCM Rekam Medis ingin menginformasikan bahwa terdapat berkas rekam medis yang belum lengkap.
-Mohon bantuannya untuk melengkapi sesuai ketentuan maksimal 2x24 jam sejak pelayanan.
+Saya dari staff KLPCM Rekam Medis izin menginformasikan bahwa terdapat berkas rekam medis yang belum lengkap.
+Mohon bantuannya untuk melengkapi sesuai ketentuan maksimal 2x24 jam sejak pasien pulang.
+Berkas sudah di kirim ke ruangan dokter oleh kami.
 Status saat ini: *Belum Lengkap*.
 
 {catatan_tambahan}
