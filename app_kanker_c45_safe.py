@@ -74,16 +74,19 @@ if uploaded_file:
                 row = df[df['Nama Dokter'] == nama].iloc[0]
                 nomor = str(row["Nomor WA"]).replace("+", "").replace(" ", "").replace("-", "").strip()
 
-                pesan = f"""Hallo{nama},
+                pesan = f"""Assalamu'alaikum {nama},
 
-Saya dengan staff KLPCM Rekam Medis izin konfirmasi dok ada berkas yang belum lengkap,
-Mohon dibantu segera melengkapi rekam medis pasien, yang sesuai aturan kelengkapan yaitu melengkapi maximal 2x24 jam.
-Berkas sudah di follow up ke poliklinik.
-Status berkas saat ini: *Belum Lengkap*.
+Saya dari staff KLPCM Rekam Medis ingin menginformasikan bahwa terdapat berkas rekam medis yang belum lengkap.
+Mohon bantuannya untuk melengkapi sesuai ketentuan maksimal 2x24 jam sejak pelayanan.
+Status saat ini: *Belum Lengkap*.
 
 {catatan_tambahan}
 
-Terima kasih sebelumnya dok """
+Terima kasih sebelumnya, dok 🙏"""
 
                 encoded_pesan = urllib.parse.quote(pesan, safe='')
-                wa_link = f"https://wa.me/{nomor}?text={encoded_pes
+                wa_link = f"https://wa.me/{nomor}?text={encoded_pesan}"
+
+                st.markdown(f"- [{nama}]({wa_link})", unsafe_allow_html=True)
+
+            st.info("Klik nama-nama di atas untuk membuka WhatsApp Web dengan isi pesan.")
