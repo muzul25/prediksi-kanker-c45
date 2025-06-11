@@ -1,21 +1,25 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.tree import DecisionTreeClassifier
+
+# Coba import DecisionTreeClassifier dan plot_tree dari sklearn
+try:
+    from sklearn.tree import DecisionTreeClassifier, plot_tree
+except ImportError:
+    st.error("Module scikit-learn belum terinstall. Silakan install dengan 'pip install scikit-learn'")
+    st.stop()
+
 import io
 
-# Coba import visualisasi
 try:
     import matplotlib.pyplot as plt
-    from sklearn.tree import plot_tree
     HAS_PLOT = True
-except:
+except ImportError:
     HAS_PLOT = False
 
 st.set_page_config(page_title="Prediksi Kanker Payudara C4.5", layout="wide")
 st.title("🩺 Prediksi Kanker Payudara - Algoritma C4.5 (Decision Tree)")
 
-# Atribut fitur dan label
 fitur = ['U', 'B', 'G', 'I', 'H', 'L', 'A', 'R']
 target_label = 'K'
 
@@ -33,11 +37,9 @@ data_training = pd.DataFrame([
     [76, 23.00, 83, 4.17, 1.10, 17.13, 5.10, 23.03, 2]
 ], columns=fitur + [target_label])
 
-# Latih model
 model = DecisionTreeClassifier(criterion='entropy', random_state=42)
 model.fit(data_training[fitur], data_training[target_label])
 
-# Tab
 tab1, tab2 = st.tabs(["🧍 Input Manual", "📁 Upload Excel"])
 
 with tab1:
@@ -75,7 +77,6 @@ with tab2:
                 st.success("✅ Prediksi Berhasil!")
                 st.dataframe(df)
 
-                # Export
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     df.to_excel(writer, index=False, sheet_name='Prediksi')
@@ -88,9 +89,8 @@ with tab2:
             else:
                 st.error(f"❌ File tidak memiliki kolom lengkap: {fitur}")
         except Exception as e:
-            st.error(f"Terjadi kesalahan: {e}")
+            st.error(f"Terjadi kesalahan saat memproses file: {e}")
 
-# Visualisasi pohon keputusan
 if HAS_PLOT:
     st.subheader("📊 Visualisasi Decision Tree (C4.5)")
     fig, ax = plt.subplots(figsize=(10, 5))
