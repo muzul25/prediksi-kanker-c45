@@ -4,22 +4,12 @@ from sklearn.tree import DecisionTreeClassifier, export_text
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 
-st.title("🧬 Prediksi Kanker Payudara - Algoritma ID3")
+st.set_page_config(page_title="Prediksi Kanker Payudara", layout="centered")
+st.title("🧬 Prediksi Kanker Payudara dengan Algoritma ID3 (Decision Tree)")
+st.markdown("Gunakan upload dataset **ATAU** input manual pasien baru.")
 
-st.markdown("""
-**Atribut yang digunakan:**
-- U = Umur (Tahun)
-- B = BMI (Kg/M2)
-- G = Glucose (mg/dL)
-- I = Insulin (µU/mL)
-- H = HOMA
-- L = Leptin (ng/mL)
-- A = Adiponectin (µg/mL)
-- R = Resistin (ng/mL)
-- K = Klasifikasi (1 = Sehat, 2 = Pasien)
-""")
-
-uploaded_file = st.file_uploader("📂 Upload dataset CSV", type=["csv"])
+# ----------- DATASET SECTION ----------------
+uploaded_file = st.file_uploader("📂 Upload Dataset (CSV)", type=["csv"])
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
@@ -28,36 +18,50 @@ if uploaded_file:
 
     required_cols = ['U', 'B', 'G', 'I', 'H', 'L', 'A', 'R', 'K']
     if not all(col in df.columns for col in required_cols):
-        st.error("⚠️ Dataset harus memiliki kolom: " + ", ".join(required_cols))
+        st.error("Dataset harus punya kolom: " + ", ".join(required_cols))
     else:
         X = df.drop(columns=['K'])
         y = df['K']
+        model = DecisionTreeClassifier(criterion="entropy")
+        model.fit(X, y)
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        # Show tree
+        st.subheader("🌳 Struktur Pohon Keputusan")
+        st.code(export_text(model, feature_names=X.columns.to_list()))
 
-        model = DecisionTreeClassifier(criterion="entropy", random_state=0)
-        model.fit(X_train, y_train)
-
-        st.subheader("🌳 Struktur Pohon Keputusan (ID3)")
-        rules = export_text(model, feature_names=list(X.columns))
-        st.code(rules)
-
-        st.subheader("📈 Evaluasi Model")
-        y_pred = model.predict(X_test)
-        st.text(classification_report(y_test, y_pred))
-
-        st.subheader("🧪 Prediksi Data Baru")
-        input_data = {}
-        for col in X.columns:
-            input_data[col] = st.number_input(f"{col}", value=0.0)
+        # Form manual input
+        st.subheader("🧾 Form Manual Input Pasien Baru")
+        col1, col2 = st.columns(2)
+        with col1:
+            umur = st.number_input("Umur (U)", min_value=1, max_value=120, step=1)
+            bmi = st.number_input("BMI (B)", format="%.2f")
+            glukosa = st.number_input("Glukosa (G)", format="%.2f")
+            insulin = st.number_input("Insulin (I)", format="%.2f")
+        with col2:
+            homa = st.number_input("HOMA (H)", format="%.2f")
+            leptin = st.number_input("Leptin (L)", format="%.2f")
+            adiponectin = st.number_input("Adiponectin (A)", format="%.2f")
+            resistin = st.number_input("Resistin (R)", format="%.2f")
 
         if st.button("🔍 Prediksi"):
-            input_df = pd.DataFrame([input_data])
+            input_df = pd.DataFrame([{
+                'U': umur,
+                'B': bmi,
+                'G': glukosa,
+                'I': insulin,
+                'H': homa,
+                'L': leptin,
+                'A': adiponectin,
+                'R': resistin
+            }])
             hasil = model.predict(input_df)[0]
-            st.success(f"Hasil prediksi: {'Healthy Controls (1)' if hasil == 1 else 'Patients (2)'}")
+            label = "✅ Sehat (Healthy Controls)" if hasil == 1 else "⚠️ Terindikasi Pasien (Patients)"
+            st.success(f"Hasil Prediksi: **{label} (K = {hasil})**")
 
-        st.subheader("⬇️ Export Hasil Prediksi")
+        st.subheader("⬇️ Export Prediksi dari Dataset")
         if st.button("Export CSV"):
             df['Prediksi'] = model.predict(X)
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button("Download hasil_prediksi.csv", csv, "hasil_prediksi.csv", "text/csv")
+else:
+    st.info("Silakan upload dataset terlebih dahulu untuk memulai prediksi dan input manual.")
