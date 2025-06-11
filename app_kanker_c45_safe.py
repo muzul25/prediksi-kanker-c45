@@ -1,66 +1,85 @@
 import streamlit as st
-from fpdf import FPDF
-from datetime import date
+import pandas as pd
+from urllib.parse import quote
+from datetime import datetime
 
-st.set_page_config(page_title="Penerbitan Surat Keterangan Kematian", layout="centered")
+st.set_page_config("📲 Follow-Up Berkas Dokter", layout="wide")
 
-st.title("🪦 Penerbitan Surat Keterangan Kematian")
+st.title("🩺 Sistem Follow-Up Berkas Dokter")
 
-# Input data jenazah
-st.subheader("📋 Data Jenazah")
-nama_jenazah = st.text_input("Nama Lengkap")
-nik_jenazah = st.text_input("NIK")
-tempat_lahir = st.text_input("Tempat Lahir")
-tanggal_lahir = st.date_input("Tanggal Lahir")
-jenis_kelamin = st.selectbox("Jenis Kelamin", ["Laki-laki", "Perempuan"])
-alamat = st.text_area("Alamat Lengkap")
-tanggal_meninggal = st.date_input("Tanggal Meninggal")
-penyebab = st.text_input("Penyebab Kematian")
+# Inisialisasi data dokter
+if "dokter_df" not in st.session_state:
+    st.session_state.dokter_df = pd.DataFrame({
+        "Nama Dokter": ["dr. Andi", "dr. Budi", "dr. Clara"],
+        "Nomor WA": ["6281234567890", "6281234500001", "6281212345678"],
+        "Status Berkas": ["❌ Belum Lengkap", "✅ Lengkap", "❌ Belum Lengkap"],
+        "Catatan": ["Belum upload hasil lab", "", "Form anamnesa belum dikirim"]
+    })
 
-# Input data pelapor
-st.subheader("📋 Data Pelapor (Ahli Waris)")
-nama_pelapor = st.text_input("Nama Pelapor")
-hubungan = st.text_input("Hubungan dengan Jenazah")
-alamat_pelapor = st.text_area("Alamat Pelapor")
+# Inisialisasi riwayat follow-up
+if "riwayat_df" not in st.session_state:
+    st.session_state.riwayat_df = pd.DataFrame(columns=["Waktu", "Nama Dokter", "Pesan"])
 
-# Tombol cetak surat
-if st.button("🖨️ Buat Surat Keterangan Kematian"):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
+# --- FORM TAMBAH DOKTER
+with st.expander("➕ Tambah Dokter Baru"):
+    with st.form("form_dokter"):
+        nama = st.text_input("Nama Dokter")
+        nomor = st.text_input("Nomor WA (cth: 6281234567890)")
+        status = st.selectbox("Status Berkas", ["❌ Belum Lengkap", "✅ Lengkap"])
+        catatan = st.text_area("Catatan Berkas")
+        submit = st.form_submit_button("Tambah ke Daftar")
 
-    pdf.cell(200, 10, txt="PEMERINTAH DESA", ln=True, align="C")
-    pdf.cell(200, 10, txt="SURAT KETERANGAN KEMATIAN", ln=True, align="C")
-    pdf.cell(200, 10, txt="Nomor: .../SKK/VI/2025", ln=True, align="C")
-    pdf.ln(10)
+        if submit:
+            new_row = pd.DataFrame({
+                "Nama Dokter": [nama],
+                "Nomor WA": [nomor],
+                "Status Berkas": [status],
+                "Catatan": [catatan]
+            })
+            st.session_state.dokter_df = pd.concat([st.session_state.dokter_df, new_row], ignore_index=True)
+            st.success(f"✅ Dokter {nama} ditambahkan!")
 
-    pdf.multi_cell(0, 10, txt=f"Yang bertanda tangan di bawah ini menerangkan bahwa pada hari ini telah meninggal dunia seseorang dengan identitas sebagai berikut:\n\n"
-                              f"Nama Lengkap    : {nama_jenazah}\n"
-                              f"NIK             : {nik_jenazah}\n"
-                              f"Tempat/Tgl Lahir: {tempat_lahir}, {tanggal_lahir.strftime('%d-%m-%Y')}\n"
-                              f"Jenis Kelamin   : {jenis_kelamin}\n"
-                              f"Alamat          : {alamat}\n"
-                              f"Tanggal Meninggal: {tanggal_meninggal.strftime('%d-%m-%Y')}\n"
-                              f"Penyebab        : {penyebab}\n\n"
-                              f"Pelapor dari kematian ini adalah:\n"
-                              f"Nama            : {nama_pelapor}\n"
-                              f"Hubungan        : {hubungan}\n"
-                              f"Alamat Pelapor  : {alamat_pelapor}\n\n"
-                              f"Demikian surat keterangan ini dibuat untuk dapat dipergunakan sebagaimana mestinya.")
+# --- TABEL & EXPORT CSV
+st.subheader("📋 Daftar Dokter")
+st.dataframe(st.session_state.dokter_df, use_container_width=True)
 
-    pdf.ln(10)
-    pdf.cell(200, 10, txt=f"Medan, {date.today().strftime('%d-%m-%Y')}", ln=True, align="R")
-    pdf.cell(200, 10, txt="Kepala Desa", ln=True, align="R")
-    pdf.ln(20)
-    pdf.cell(200, 10, txt="(............................)", ln=True, align="R")
+csv = st.session_state.dokter_df.to_csv(index=False).encode("utf-8")
+st.download_button("⬇️ Download CSV Dokter", data=csv, file_name="daftar_dokter.csv", mime="text/csv")
 
-    filename = "surat_keterangan_kematian.pdf"
-    pdf.output(filename)
+# --- PILIH DOKTER UNTUK FOLLOW-UP
+st.subheader("📤 Follow-Up WhatsApp")
+df_filter = st.session_state.dokter_df[st.session_state.dokter_df["Status Berkas"] == "❌ Belum Lengkap"]
 
-    with open(filename, "rb") as f:
-        st.download_button(
-            label="📥 Download Surat Kematian (PDF)",
-            data=f,
-            file_name=filename,
-            mime="application/pdf"
-        )
+if len(df_filter) == 0:
+    st.info("Semua dokter sudah melengkapi berkas 🙌")
+else:
+    dokter_terpilih = st.selectbox("Pilih Dokter yang Belum Lengkap", df_filter["Nama Dokter"])
+    catatan_tambahan = st.text_area("📝 Tambahkan Catatan Tambahan (Opsional)")
+
+    info = df_filter[df_filter["Nama Dokter"] == dokter_terpilih].iloc[0]
+    nomor = info["Nomor WA"]
+    catatan = info["Catatan"]
+
+    # Buat isi pesan
+    pesan = f"Halo {dokter_terpilih}, mohon segera melengkapi berkas pasien.\n\nCatatan: {catatan}"
+    if catatan_tambahan:
+        pesan += f"\nTambahan: {catatan_tambahan}"
+    url = f"https://wa.me/{nomor}?text={quote(pesan)}"
+
+    # Tampilkan tautan WA
+    st.markdown(f"👉 [📲 Kirim WhatsApp ke {dokter_terpilih}]({url})", unsafe_allow_html=True)
+
+    if st.button("📌 Simpan ke Riwayat Follow-Up"):
+        waktu = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        new_row = pd.DataFrame([[waktu, dokter_terpilih, pesan]], columns=["Waktu", "Nama Dokter", "Pesan"])
+        st.session_state.riwayat_df = pd.concat([st.session_state.riwayat_df, new_row], ignore_index=True)
+        st.success("✅ Riwayat follow-up disimpan.")
+
+# --- TAMPILKAN RIWAYAT
+st.subheader("🕘 Riwayat Follow-Up")
+if st.session_state.riwayat_df.empty:
+    st.info("Belum ada follow-up dilakukan.")
+else:
+    st.dataframe(st.session_state.riwayat_df, use_container_width=True)
+    riwayat_csv = st.session_state.riwayat_df.to_csv(index=False).encode("utf-8")
+    st.download_button("⬇️ Download Riwayat Follow-Up", data=riwayat_csv, file_name="riwayat_followup.csv", mime="text/csv")
