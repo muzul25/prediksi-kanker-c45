@@ -1,79 +1,60 @@
 import streamlit as st
 import pandas as pd
-from sklearn.tree import DecisionTreeClassifier
-import io
+from sklearn.tree import DecisionTreeClassifier, export_text
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+import base64
 
-st.set_page_config(page_title="Prediksi Kanker Payudara C4.5", layout="wide")
-st.title("🩺 Prediksi Kanker Payudara - Algoritma C4.5 (Decision Tree)")
+st.set_page_config(page_title="Prediksi Kanker Payudara - C4.5", layout="wide")
+st.title("🎗️ Prediksi Kanker Payudara dengan C4.5")
 
-fitur = ['U', 'B', 'G', 'I', 'H', 'L', 'A', 'R']
-target_label = 'K'
+uploaded_file = st.file_uploader("📂 Upload Dataset CSV", type=["csv"])
 
-# Data training dummy
-data_training = pd.DataFrame([
-    [34, 23.50, 70, 10.56, 0.74, 8.81, 13.11, 11.79, 1],
-    [29, 20.69, 92, 16.64, 4.47, 8.84, 26.72, 4.30, 2],
-    [25, 23.12, 91, 4.33, 0.78, 17.94, 23.67, 6.71, 1],
-    [24, 21.37, 77, 41.61, 15.29, 9.88, 36.06, 4.50, 2],
-    [38, 21.11, 92, 22.03, 1.56, 6.70, 17.95, 4.66, 2],
-    [69, 22.85, 92, 3.19, 1.14, 6.83, 20.32, 4.53, 2],
-    [60, 32.04, 77, 9.67, 7.84, 6.96, 38.04, 9.61, 2],
-    [77, 23.80, 118, 28.68, 2.63, 4.31, 7.78, 8.49, 2],
-    [76, 22.00, 97, 10.40, 3.78, 4.47, 5.46, 11.77, 2],
-    [76, 23.00, 83, 4.17, 1.10, 17.13, 5.10, 23.03, 2]
-], columns=fitur + [target_label])
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    st.subheader("📋 Data yang Diupload")
+    st.write(df)
 
-model = DecisionTreeClassifier(criterion='entropy', random_state=42)
-model.fit(data_training[fitur], data_training[target_label])
+    if 'K' not in df.columns:
+        st.error("Kolom label 'K' (klasifikasi) tidak ditemukan.")
+    else:
+        X = df.drop(columns=['K', 'NP'], errors='ignore')  # NP = Nama Pasien jika ada
+        y = df['K']
 
-tab1, tab2 = st.tabs(["🧍 Input Manual", "📁 Upload Excel"])
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-with tab1:
-    st.subheader("Input Data Pasien")
-    user_data = {}
-    label_dict = {
-        'U': "Umur (tahun)", 'B': "BMI (kg/m²)", 'G': "Glukosa (mg/dL)",
-        'I': "Insulin (µU/mL)", 'H': "HOMA", 'L': "Leptin (ng/mL)",
-        'A': "Adiponektin (µg/mL)", 'R': "Resistin (ng/mL)"
-    }
-    for f in fitur:
-        user_data[f] = st.number_input(label_dict[f], min_value=0.0, format="%.2f")
+        # Model
+        model = DecisionTreeClassifier(criterion="entropy", random_state=42)
+        model.fit(X_train, y_train)
 
-    if st.button("🔍 Prediksi Manual"):
-        input_df = pd.DataFrame([user_data])
-        pred = model.predict(input_df)[0]
-        hasil = "✅ Healthy Controls (1)" if pred == 1 else "⚠️ Patients (2)"
-        st.success(f"Hasil Prediksi: {hasil}")
+        st.subheader("🌲 Pohon Keputusan (C4.5 Style)")
+        st.text(export_text(model, feature_names=list(X.columns)))
 
-with tab2:
-    st.subheader("Upload File Excel/CSV")
-    uploaded_file = st.file_uploader("Unggah file berisi kolom: U, B, G, I, H, L, A, R", type=['xlsx', 'csv'])
+        # Evaluasi
+        y_pred = model.predict(X_test)
+        report = classification_report(y_test, y_pred, output_dict=True)
+        st.subheader("📊 Evaluasi Model")
+        st.json(report)
 
-    if uploaded_file:
-        try:
-            if uploaded_file.name.endswith(".csv"):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
+        # Prediksi Data Baru
+        st.subheader("🧪 Prediksi Data Baru")
+        input_data = {}
+        for col in X.columns:
+            input_data[col] = st.number_input(f"{col}", value=0.0)
+        
+        if st.button("Prediksi"):
+            df_new = pd.DataFrame([input_data])
+            prediction = model.predict(df_new)[0]
+            st.success(f"Hasil Prediksi: {'Sehat (1)' if prediction == 1 else 'Pasien (2)'}")
 
-            if all(col in df.columns for col in fitur):
-                prediksi = model.predict(df[fitur])
-                df['Prediction'] = prediksi
-                df['Prediction_Label'] = df['Prediction'].map({1: 'Healthy', 2: 'Patient'})
-                st.success("✅ Prediksi Berhasil!")
-                st.dataframe(df)
+        # Simpan hasil ke Excel
+        if st.button("📤 Ekspor Hasil Prediksi ke Excel"):
+            df['Prediksi'] = model.predict(X)
+            excel_file = "hasil_prediksi.xlsx"
+            df.to_excel(excel_file, index=False)
 
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Prediksi')
-                st.download_button(
-                    label="💾 Download Hasil Prediksi",
-                    data=output.getvalue(),
-                    file_name="hasil_prediksi_kanker.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            else:
-                st.error(f"❌ File tidak memiliki kolom lengkap: {fitur}")
-        except Exception as e:
-            st.error(f"Terjadi kesalahan saat memproses file: {e}")
-            
+            with open(excel_file, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="{excel_file}">⬇️ Unduh hasil_prediksi.xlsx</a>'
+                st.markdown(href, unsafe_allow_html=True)
