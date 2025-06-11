@@ -1,21 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-
-# Coba import DecisionTreeClassifier dan plot_tree dari sklearn
-try:
-    from sklearn.tree import DecisionTreeClassifier, plot_tree
-except ImportError:
-    st.error("Module scikit-learn belum terinstall. Silakan install dengan 'pip install scikit-learn'")
-    st.stop()
-
+from sklearn.tree import DecisionTreeClassifier
 import io
-
-try:
-    import matplotlib.pyplot as plt
-    HAS_PLOT = True
-except ImportError:
-    HAS_PLOT = False
 
 st.set_page_config(page_title="Prediksi Kanker Payudara C4.5", layout="wide")
 st.title("🩺 Prediksi Kanker Payudara - Algoritma C4.5 (Decision Tree)")
@@ -90,11 +76,3 @@ with tab2:
                 st.error(f"❌ File tidak memiliki kolom lengkap: {fitur}")
         except Exception as e:
             st.error(f"Terjadi kesalahan saat memproses file: {e}")
-
-if HAS_PLOT:
-    st.subheader("📊 Visualisasi Decision Tree (C4.5)")
-    fig, ax = plt.subplots(figsize=(10, 5))
-    plot_tree(model, feature_names=fitur, class_names=['1: Healthy', '2: Patient'], filled=True, rounded=True)
-    st.pyplot(fig)
-else:
-    st.info("Visualisasi tidak tersedia. matplotlib belum terinstal.")
