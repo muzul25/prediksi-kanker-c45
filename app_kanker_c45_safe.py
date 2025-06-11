@@ -74,7 +74,7 @@ if uploaded_file:
                 row = df[df['Nama Dokter'] == nama].iloc[0]
                 nomor = str(row["Nomor WA"]).replace("+", "").replace(" ", "").replace("-", "").strip()
 
-                pesan = f"""Assalamu'alaikum {nama},
+                pesan = f"""Hallo {nama},
 
 Saya dari staff KLPCM Rekam Medis izin menginformasikan bahwa terdapat berkas rekam medis yang belum lengkap.
 Mohon bantuannya untuk melengkapi sesuai ketentuan maksimal 2x24 jam sejak pasien pulang.
