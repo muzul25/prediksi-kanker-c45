@@ -2,12 +2,15 @@ import streamlit as st
 import pandas as pd
 import urllib.parse
 import io
+from datetime import datetime
+import locale
 
+# === Set Judul Aplikasi ===
 st.set_page_config(page_title="Follow-Up Dokter RM", layout="wide")
 st.title("📁 Follow-Up WhatsApp Rekam Medis Dokter")
 
-# === Download Template ===
-st.markdown("### 📥 Download Template Dokter")
+# === Template Dokter Excel ===
+st.markdown("### 📥 Download Template Excel Dokter")
 template_data = pd.DataFrame({
     "Nama Dokter": ["dr. Andi", "dr. Clara"],
     "Nomor WA": ["6281234567890", "6289876543210"],
@@ -25,11 +28,10 @@ st.download_button(
 
 st.markdown("---")
 
-# === Upload Spreadsheet ===
+# === Upload File ===
 uploaded_file = st.file_uploader("📤 Upload Spreadsheet Dokter (CSV/XLSX)", type=["csv", "xlsx"])
 
 if uploaded_file:
-    # Load file
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
@@ -37,26 +39,48 @@ if uploaded_file:
 
     st.success("✅ File berhasil dimuat!")
 
-    # Validasi kolom
     required_cols = ['Nama Dokter', 'Nomor WA', 'Status']
     if not all(col in df.columns for col in required_cols):
-        st.error(f"❌ Kolom wajib: {', '.join(required_cols)}")
+        st.error(f"❌ Spreadsheet harus memiliki kolom: {', '.join(required_cols)}")
     else:
-        # Filter belum lengkap
+        # Filter hanya yang belum lengkap
         df_belum = df[~df['Status'].str.lower().str.contains("lengkap")]
-        
+
         if df_belum.empty:
             st.success("🎉 Semua dokter sudah lengkap!")
         else:
-            st.markdown("### 👨‍⚕️ Pilih Dokter yang Akan Dikirim")
+            st.markdown("### 👨‍⚕️ Pilih Dokter untuk Dikirim Notifikasi")
             selected_dokter = st.multiselect("Pilih Dokter", df_belum['Nama Dokter'].tolist(), default=df_belum['Nama Dokter'].tolist())
 
-            catatan_tambahan = st.text_input("📝 Tambahkan Catatan Tambahan (opsional):", "")
+            st.markdown("### 📅 Tambahkan Jadwal Follow-Up")
 
-            if st.button("📤 Kirim Pesan WhatsApp ke Semua"):
+            jumlah_tanggal = st.number_input("Berapa tanggal follow-up?", min_value=1, max_value=10, value=1, step=1)
+
+            jadwal_list = []
+
+            # Gunakan nama hari manual (untuk support cross-platform)
+            nama_hari_dict = {
+                0: "Senin", 1: "Selasa", 2: "Rabu",
+                3: "Kamis", 4: "Jumat", 5: "Sabtu", 6: "Minggu"
+            }
+
+            for i in range(jumlah_tanggal):
+                with st.expander(f"Tanggal #{i+1}"):
+                    tanggal = st.date_input(f"Pilih tanggal ke-{i+1}", key=f"tgl_{i}")
+                    jumlah = st.number_input(f"Jumlah berkas pada tanggal tersebut", min_value=1, key=f"jumlah_{i}")
+                    if tanggal:
+                        nama_hari = nama_hari_dict[tanggal.weekday()]
+                        tanggal_fmt = tanggal.strftime("%d/%m/%Y")
+                        jadwal = f"Hari {nama_hari}, tanggal {tanggal_fmt} Sebanyak {jumlah} Berkas"
+                        jadwal_list.append(jadwal)
+
+            catatan_tambahan = "\n".join(jadwal_list)
+
+            if st.button("📤 Kirim Pesan WhatsApp ke Semua Dokter Terpilih"):
+                st.markdown("### 🔗 Link WhatsApp:")
                 for nama in selected_dokter:
                     row = df_belum[df_belum['Nama Dokter'] == nama].iloc[0]
-                    nomor = str(row["Nomor WA"]).strip()
+                    nomor = str(row["Nomor WA"]).replace("+", "").replace(" ", "").replace("-", "").strip()
                     status = row["Status"]
 
                     pesan = f"""Assalamu'alaikum {nama},
@@ -68,10 +92,9 @@ Status saat ini: *{status}*.
 
 Terima kasih 🙏"""
 
-                    encoded_pesan = urllib.parse.quote(pesan)
+                    encoded_pesan = urllib.parse.quote(pesan, safe='')
                     wa_link = f"https://wa.me/{nomor}?text={encoded_pesan}"
 
-                    # Tampilkan linknya
                     st.markdown(f"- [{nama}]({wa_link})", unsafe_allow_html=True)
-                
-                st.info("Klik nama-nama di atas untuk membuka WhatsApp Web secara manual (dibuka di tab baru).")
+
+                st.info("Klik nama-nama di atas untuk membuka WhatsApp Web dengan isi pesan.")
